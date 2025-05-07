@@ -98,22 +98,12 @@ void write_log(const char* source, const char* action, const char* info) {
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
     
-    // Buat path absolut untuk file log
+    // Buat direktori server jika belum ada
+    mkdir("server", 0755);
+    
+    // Buat file log langsung di direktori server
     char log_path[PATH_MAX_LEN];
-    
-    // Pastikan direktori server ada
-    char server_dir[PATH_MAX_LEN];
-    get_absolute_path(server_dir, "server");
-    mkdir(server_dir, 0755);
-    
-    // Buat path log file dengan pengecekan panjang
-    if (strlen(server_dir) + 12 > PATH_MAX_LEN) {
-        // Path terlalu panjang, gunakan path pendek
-        strcpy(log_path, "server.log");
-    } else {
-        strcpy(log_path, server_dir);
-        strcat(log_path, "/server.log");
-    }
+    snprintf(log_path, PATH_MAX_LEN, "server/server.log");
     
     FILE* logfile = fopen(log_path, "a");
     if (!logfile) {
@@ -156,29 +146,13 @@ char* save_decoded_file(const char* text_data) {
         return "ERROR: Failed to decode hex data";
     }
     
-    // Buat path file output dengan path absolut
-    char database_dir[PATH_MAX_LEN];
-    get_absolute_path(database_dir, "server/database");
-    
     // Pastikan direktori database ada
-    mkdir(database_dir, 0755);
+    mkdir("server", 0755);
+    mkdir("server/database", 0755);
     
+    // Buat path file output
     char filepath[PATH_MAX_LEN];
-    
-    // Periksa panjang path gabungan
-    if (strlen(database_dir) + strlen(filename) + 2 > PATH_MAX_LEN) {
-        if (DEBUG_MODE) {
-            printf("Path too long\n");
-        }
-        free(reversed);
-        free(decoded);
-        return "ERROR: Path too long";
-    }
-    
-    // Gabungkan path dengan aman menggunakan strcpy+strcat
-    strcpy(filepath, database_dir);
-    strcat(filepath, "/");
-    strcat(filepath, filename);
+    snprintf(filepath, PATH_MAX_LEN, "server/database/%s", filename);
     
     if (DEBUG_MODE) {
         printf("Saving to path: %s\n", filepath);
@@ -211,24 +185,9 @@ char* save_decoded_file(const char* text_data) {
 
 // Fungsi untuk mengambil file dari server
 char* get_file(const char* filename, size_t* size) {
-    char database_dir[PATH_MAX_LEN];
-    get_absolute_path(database_dir, "server/database");
-    
+    // Buat path file
     char filepath[PATH_MAX_LEN];
-    
-    // Periksa panjang path
-    if (strlen(database_dir) + strlen(filename) + 2 > PATH_MAX_LEN) {
-        if (DEBUG_MODE) {
-            printf("Path too long\n");
-        }
-        *size = 0;
-        return NULL;
-    }
-    
-    // Gabungkan path dengan aman
-    strcpy(filepath, database_dir);
-    strcat(filepath, "/");
-    strcat(filepath, filename);
+    snprintf(filepath, PATH_MAX_LEN, "server/database/%s", filename);
     
     if (DEBUG_MODE) {
         printf("Attempting to read file %s\n", filepath);
@@ -321,18 +280,11 @@ int main() {
     }
     
     // Buat direktori yang diperlukan
-    char server_dir[PATH_MAX_LEN];
-    char database_dir[PATH_MAX_LEN];
-    get_absolute_path(server_dir, "server");
-    get_absolute_path(database_dir, "server/database");
-    
-    mkdir(server_dir, 0755);
-    mkdir(database_dir, 0755);
+    mkdir("server", 0755);
+    mkdir("server/database", 0755);
     
     if (DEBUG_MODE) {
-        printf("Created directories:\n");
-        printf("- %s\n", server_dir);
-        printf("- %s\n", database_dir);
+        printf("Created directories: server and server/database\n");
     }
     
     // Buat socket
