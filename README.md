@@ -19,124 +19,138 @@ Untuk soal ini, kami diminta untuk membuat server dengan gim yang terdiri dari d
 
 shop.h
 
-  #ifndef SHOP_H
-  #define SHOP_H
+    #ifndef SHOP_H
+    #define SHOP_H
 
 Header guard yang digunakan agar file ini tidak dimasukkan lebih dari sekali saat proses kompilasi.
+
 #ifndef artinya jika SHOP_H belum didefinisikan
+
 #define SHOP_H mendefinisikan SHOP_H, sehingga jika nanti file ini di-include lagi, isinya akan diabaikan (menghindari duplikasi simbol).
 
-  #define MAX_WEAPONS 6
-  #define NAME_LEN    32
-  #define PASS_LEN    64
+    #define MAX_WEAPONS 6
+    #define NAME_LEN    32
+    #define PASS_LEN    64
 
 MAX_WEAPONS: jumlah maksimal senjata di toko.
+
 NAME_LEN: panjang maksimal nama senjata.
+
 PASS_LEN: panjang maksimal deskripsi passive senjata.
 
-  typedef struct {
-      int  id;
-      char name[NAME_LEN];
-      int  price;
-      int  damage;
-      int  hasPassive;           // 0 = no, 1 = yes
-      char passiveDesc[PASS_LEN];
-  } Weapon;
+    typedef struct {
+        int  id;
+        char name[NAME_LEN];
+        int  price;
+        int  damage;
+        int  hasPassive;           // 0 = no, 1 = yes
+        char passiveDesc[PASS_LEN];
+    } Weapon;
 
 Struktur ini mewakili sebuah senjata dan terdiri dari:
+
 id: ID unik senjata.
+
 name: nama senjata (maks 32 karakter).
+
 price: harga senjata.
+
 damage: jumlah damage yang bisa dihasilkan.
+
 hasPassive: apakah senjata punya efek tambahan (1) atau tidak (0).
+
 passiveDesc: deskripsi dari efek pasif (jika ada).
 
-  void getShopList(Weapon **list, int *count);
+    void getShopList(Weapon **list, int *count);
 
 Ini adalah deklarasi fungsi getShopList. Fungsi ini memberikan daftar senjata yang tersedia di toko. Array yang dikembalikan adalah static, artinya sudah ada di memori, dan tidak boleh di-free oleh pemanggil fungsi.
+
 Weapon **list: pointer ke pointer yang nanti akan menunjuk ke array senjata.
+
 int *count: untuk mengembalikan jumlah senjata.
 
-  #endif // SHOP_H
+    #endif // SHOP_H
 
 Akhir dari header guard
 
 shop.c
 
-  #include <string.h>
-  #include "shop.h"
+    #include <string.h>
+    #include "shop.h"
 
 Memasukkan deklarasi yang dari shop.h sehingga definisi Weapon dan getShopList() dapat digunakan
 
-  static Weapon weapons[MAX_WEAPONS] = {
-      { 0, "Iron Sword",    20,  8, 0, "" },
-      { 1, "Steel Axe",     30, 10, 1, "+10% Crit Chance" },
-      { 2, "Magic Wand",    50, 12, 1, "Chance to Silence" },
-      { 3, "Wooden Club",   10,  5, 0, "" },
-      { 4, "Dragon Spear",  80, 15, 0, "" },
-      { 5, "Shadow Dagger", 35,  9, 1, "+20% Attack Speed" }
-  };
+    static Weapon weapons[MAX_WEAPONS] = {
+        { 0, "Iron Sword",    20,  8, 0, "" },
+        { 1, "Steel Axe",     30, 10, 1, "+10% Crit Chance" },
+        { 2, "Magic Wand",    50, 12, 1, "Chance to Silence" },
+        { 3, "Wooden Club",   10,  5, 0, "" },
+        { 4, "Dragon Spear",  80, 15, 0, "" },
+        { 5, "Shadow Dagger", 35,  9, 1, "+20% Attack Speed" }
+    };
 
 Array statis dari objek Weapon
 
-  void getShopList(Weapon **list, int *count) {
-      *list  = weapons;
-      *count = MAX_WEAPONS;
-  }
+    void getShopList(Weapon **list, int *count) {
+        *list  = weapons;
+        *count = MAX_WEAPONS;
+    }
 
 Fungsi getShopList yang digunakan untuk memberikan daftar Weapon
 
 dungeon.c
 
-  #include <stdio.h>
-  #include <stdlib.h>
-  #include <string.h>
-  #include <unistd.h>
-  #include <arpa/inet.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <arpa/inet.h>
 
 Digunakan untuk input/output, string, socket, dan alamat IP.
 
-  #define SERVER_IP   "127.0.0.1"
-  #define SERVER_PORT 8080
-  #define BUF_SIZE    512
+    #define SERVER_IP   "127.0.0.1"
+    #define SERVER_PORT 8080
+    #define BUF_SIZE    512
 
 Alamat server lokal (localhost) dengan port 8080.
+
 Buffer untuk menerima data dari server (maks 512 byte).
 
-  void showMenu() {
-      puts("\n== WELCOME TO DUNGEON ==");
-      puts("1. Show Player Stats");
-      puts("2. View Inventory & Equip Weapons");
-      puts("3. Shop");
-      puts("4. Battle Mode");
-      puts("5. Exit");
-      printf("Choose an option: ");
-  }
+    void showMenu() {
+        puts("\n== WELCOME TO DUNGEON ==");
+        puts("1. Show Player Stats");
+        puts("2. View Inventory & Equip Weapons");
+        puts("3. Shop");
+        puts("4. Battle Mode");
+        puts("5. Exit");
+        printf("Choose an option: ");
+    }
 
 Menampilkan menu pilihan ke pemain.
 
-  void readFullResponse(int sock) {
-      char buf[BUF_SIZE];
-      while (1) {
-          int n = read(sock, buf, BUF_SIZE - 1);
-          if (n <= 0) break;
-          buf[n] = 0;
-          printf("%s", buf);
-          if (n < BUF_SIZE - 1) break;
-      }
-  }
+    void readFullResponse(int sock) {
+        char buf[BUF_SIZE];
+        while (1) {
+            int n = read(sock, buf, BUF_SIZE - 1);
+            if (n <= 0) break;
+            buf[n] = 0;
+            printf("%s", buf);
+            if (n < BUF_SIZE - 1) break;
+        }
+    }
 
 Menerima pesan dari server lalu menulisnya di terminal. Jika pesannya kurang dari buffer maksimal, maka dianggap selesai.
 
-  int main() {
-      int sock = socket(AF_INET, SOCK_STREAM, 0);
-      struct sockaddr_in serv = {
-          .sin_family = AF_INET,
-          .sin_port   = htons(SERVER_PORT)
-      };
-      inet_pton(AF_INET, SERVER_IP, &serv.sin_addr);
+    int main() {
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in serv = {
+            .sin_family = AF_INET,
+            .sin_port   = htons(SERVER_PORT)
+        };
+        inet_pton(AF_INET, SERVER_IP, &serv.sin_addr);
 
 Membuat socket TCP.
+
 Menyiapkan alamat server (AF_INET, port 8080, IP 127.0.0.1).
 
       if (connect(sock, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
@@ -245,7 +259,7 @@ Memasuki mode Battle. Player bisa menulis ATTACK untuk menyerang atau EXIT_BATTL
   
       close(sock);
       return 0;
-  }
+      }
 
 Keluar dari gim dengan mengirim perintah EXIT ke server, menutup konseksi, lalu mengakhiri program.
 
@@ -261,90 +275,113 @@ Player.c
     #include "shop.c"
 
 stdio.h, stdlib.h, string.h, unistd.h, time.h: library dasar C untuk I/O, memori, string, fungsi sleep dan waktu.
+
 pthread.h: digunakan untuk multithreading (agar server bisa melayani banyak klien secara paralel).
+
 arpa/inet.h: digunakan untuk fungsi socket seperti htons, inet_ntoa, dll.
+
 shop.c: file eksternal yang berisi daftar senjata (Weapon) dan fungsi getShopList
   
-  #define PORT         8080
-  #define MAX_CLIENTS  10
-  #define BUF_SIZE     512
-  #define MAX_INV      20
-  #define MAX_NAME     32
+    #define PORT         8080
+    #define MAX_CLIENTS  10
+    #define BUF_SIZE     512
+    #define MAX_INV      20
+    #define MAX_NAME     32
 
 Makro untuk mengatur batasan program:
+
 PORT: port TCP server.
+
 MAX_CLIENTS: maksimal jumlah klien yang bisa dilayani.
+
 BUF_SIZE: ukuran buffer untuk pesan teks.
+
 MAX_INV: maksimal senjata di inventory pemain.
+
 MAX_NAME: panjang nama maksimal
 
-  int      gold[MAX_CLIENTS];
-  int      invCount[MAX_CLIENTS];
-  Weapon   inventory[MAX_CLIENTS][MAX_INV];
-  int      equippedId[MAX_CLIENTS];    
-  int      kills[MAX_CLIENTS];
-  
-  int      inBattle[MAX_CLIENTS];
-  int      enemyHp[MAX_CLIENTS];
-  int      enemyMaxHp[MAX_CLIENTS];
-  int      enemyReward[MAX_CLIENTS];
+    int      gold[MAX_CLIENTS];
+    int      invCount[MAX_CLIENTS];
+    Weapon   inventory[MAX_CLIENTS][MAX_INV];
+    int      equippedId[MAX_CLIENTS];    
+    int      kills[MAX_CLIENTS];
+    
+    int      inBattle[MAX_CLIENTS];
+    int      enemyHp[MAX_CLIENTS];
+    int      enemyMaxHp[MAX_CLIENTS];
+    int      enemyReward[MAX_CLIENTS];
 
 Setiap array ini menyimpan data per pemain (indeks berdasarkan cid / client ID):
+
 gold: jumlah emas pemain.
+
 invCount: jumlah item di inventory pemain.
+
 inventory: array senjata untuk setiap pemain.
+
 equippedId: ID dari senjata yang sedang dipakai.
+
 kills: jumlah musuh yang dikalahkan.
+
 Untuk pertarungan:
+
 inBattle: status apakah pemain sedang bertarung.
+
 enemyHp, enemyMaxHp: HP musuh saat ini dan maksimal.
+
 enemyReward: emas yang didapat jika musuh dikalahkan.
 
-  const Weapon FISTS = { -1, "Fists", 0, 5, 0, "" };
+    const Weapon FISTS = { -1, "Fists", 0, 5, 0, "" };
 
 Senjata default jika pemain belum membeli/menyimpan senjata. Damage 5, tanpa harga, tanpa pasif.
 
-  static int randRange(int a, int b) {
-      return a + rand() % (b - a + 1);
-  }
-  
-  void spawnEnemy(int cid) {
-      enemyMaxHp[cid]  = randRange(50, 200);
-      enemyHp[cid]     = enemyMaxHp[cid];
-      enemyReward[cid] = randRange(10, 50);
-      inBattle[cid]    = 1;
-  }
+    static int randRange(int a, int b) {
+        return a + rand() % (b - a + 1);
+    }
+    
+    void spawnEnemy(int cid) {
+        enemyMaxHp[cid]  = randRange(50, 200);
+        enemyHp[cid]     = enemyMaxHp[cid];
+        enemyReward[cid] = randRange(10, 50);
+        inBattle[cid]    = 1;
+    }
 
-Digunakan saat pemain memulai pertarungan.
-Musuh diberikan HP dan reward emas acak.
+Digunakan saat pemain memulai pertarungan. Musuh diberikan HP dan reward emas acak.
 
-  void buildHpBar(int cid, char *out) {
-      int total = 20;
-      int filled = (int)((double)enemyHp[cid] / enemyMaxHp[cid] * total);
-      if (filled<0) filled=0;
-      char bar[32] = {0};
-      int i;
-      for (i=0;i<filled;i++)    bar[i] = '=';
-      for (; i<total; i++)      bar[i] = ' ';
-      sprintf(out, "[%s] HP: %d/%d\n", bar, enemyHp[cid], enemyMaxHp[cid]);
-  }
+    void buildHpBar(int cid, char *out) {
+        int total = 20;
+        int filled = (int)((double)enemyHp[cid] / enemyMaxHp[cid] * total);
+        if (filled<0) filled=0;
+        char bar[32] = {0};
+        int i;
+        for (i=0;i<filled;i++)    bar[i] = '=';
+        for (; i<total; i++)      bar[i] = ' ';
+        sprintf(out, "[%s] HP: %d/%d\n", bar, enemyHp[cid], enemyMaxHp[cid]);
+    }
 
-Membuat string seperti [===== ] HP: 50/100 untuk menunjukkan status musuh.
-Digunakan saat menyerang musuh.
+Membuat string seperti [===== ] HP: 50/100 untuk menunjukkan status musuh. Digunakan saat menyerang musuh.
 
-  void handle_client(int clientSock, int cid) {
-      char buf[BUF_SIZE], resp[BUF_SIZE];
-      Weapon *shopList; int shopCount;
-      getShopList(&shopList, &shopCount);
+    void handle_client(int clientSock, int cid) {
+        char buf[BUF_SIZE], resp[BUF_SIZE];
+        Weapon *shopList; int shopCount;
+        getShopList(&shopList, &shopCount);
 
 Signature & Parameter
+
 clientSock: socket descriptor untuk komunikasi dengan klien ini.
+
 cid: client ID (0…MAX_CLIENTS–1) yang dipakai untuk mengindeks state pemain.
+
 Buffer
+
 buf[BUF_SIZE] untuk menampung data masuk dari client.
+
 resp[BUF_SIZE] untuk menyusun pesan balasan.
+
 Daftar Shop
+
 Weapon *shopList; int shopCount; diisi dengan getShopList() dari modul shop (shop.c).
+
 shopList menunjuk ke array senjata statis, shopCount berisi jumlahnya.
 
       gold[cid]        = 100;
@@ -354,10 +391,15 @@ shopList menunjuk ke array senjata statis, shopCount berisi jumlahnya.
       inBattle[cid]    = 0;
 
 Inisialisasi State Pemain
+
 Gold mulai di-setup jadi 100.
+
 invCount (jumlah item di inventory) = 0.
+
 equippedId = –1 menandakan belum ada senjata terpasang.
+
 kills = 0.
+
 inBattle = 0 (belum bertarung).
 
       while (1) {
@@ -367,8 +409,11 @@ inBattle = 0 (belum bertarung).
           buf[strcspn(buf, "\r\n")] = 0;
 
 memset bersihkan buf.
+
 read(...) membaca sampai BUF_SIZE-1 byte dari socket.
+
 Jika len ≤ 0, artinya klien memutus koneksi → keluar loop.
+
 buf[strcspn(buf, "\r\n")] = 0; buang \r atau \n di akhir input.
 
           char cmd[16]; int arg;
@@ -376,8 +421,11 @@ buf[strcspn(buf, "\r\n")] = 0; buang \r atau \n di akhir input.
           sscanf(buf, "%15s %d", cmd, &arg);
 
 Parsing Perintah
+
 cmd menampung token pertama (maks 15 karakter).
+
 arg menampung angka setelah perintah (jika ada), default -1.
+
 Contoh: BUY 2 → cmd = "BUY", arg = 2.
 
           if (strcmp(cmd,"SHOW_STATS")==0) {
@@ -386,7 +434,9 @@ Contoh: BUY 2 → cmd = "BUY", arg = 2.
                            : inventory[cid][equippedId[cid]]);
             
 Mengecek apakah pemain sudah memilih senjata (equippedId[cid]).
+
 Jika belum (< 0), gunakan senjata default FISTS.
+
 Kalau sudah, ambil dari inventory[cid].
             
               int n = snprintf(resp, BUF_SIZE,
@@ -407,7 +457,8 @@ Kalau sudah, ambil dari inventory[cid].
           }
 
 Menyusun resp berisi status pemain: jumlah gold, senjata aktif, damage, deskripsi passive (jika ada), dan total kill.
-Trik aneh di hasPassive ? (...) : "" dipakai agar bisa menyisipkan deskripsi passive jika senjata punya efek passive (ini sedikit keliru dan bisa dibenahi).
+
+hasPassive: dipakai agar bisa menyisipkan deskripsi passive jika senjata punya efek passive.
 Hasil dikirim ke klien via write.
         
           else if (strcmp(cmd,"SHOP")==0) {
@@ -430,7 +481,9 @@ Hasil dikirim ke klien via write.
           }
 
 Menampilkan daftar senjata di toko (shopList).
+
 Tiap senjata: ID, nama, harga, damage, dan indikator passive jika ada.
+
 Semua info dijadikan string dan dikirim ke klien.
         
           else if (strcmp(cmd,"BUY")==0) {
@@ -439,6 +492,7 @@ Semua info dijadikan string dan dikirim ke klien.
                   if (shopList[i].id==arg) { found=i; break; }
 
 Cari senjata yang ingin dibeli (arg adalah ID-nya).
+
 Kalau tidak ditemukan, found tetap –1.
                 
               if (found<0) {
@@ -456,10 +510,15 @@ Kalau tidak ditemukan, found tetap –1.
           }
 
 Cek validasi:
+
 ID tidak valid → error.
+
 Gold kurang → error.
+
 Inventory penuh → error.
+
 Kalau semua valid, senjata ditambahkan ke inventory[cid], gold dikurangi, dan invCount bertambah.
+
 Kirim hasil pembelian ke klien.
         
           else if (strcmp(cmd,"INVENTORY")==0) {
@@ -483,11 +542,17 @@ Kirim hasil pembelian ke klien.
           }
 
 Jika inventory kosong → tampilkan pesan khusus.
+
 Jika tidak, tampilkan semua item:
+
 Index (urutan)
+
 Nama senjata
+
 Damage
+
 Keterangan (Passive) jika punya efek tambahan
+
 Tambahkan instruksi untuk menggunakan EQUIP <index>.
         
           else if (strcmp(cmd,"EQUIP")==0) {
@@ -502,7 +567,9 @@ Tambahkan instruksi untuk menggunakan EQUIP <index>.
           }
 
 Cek apakah index valid (arg adalah index senjata dalam inventory).
+
 Kalau valid → atur equippedId[cid] agar menunjuk ke senjata itu.
+
 Kirim konfirmasi ke klien.
         
           else if (strcmp(cmd,"BATTLE")==0) {
@@ -513,7 +580,9 @@ Kirim konfirmasi ke klien.
           }
 
 Panggil spawnEnemy() untuk menghasilkan musuh baru.
+
 Tampilkan pesan musuh muncul + HP bar musuh dengan buildHpBar().
+
 Kirim ke klien.
         
           else if (strcmp(cmd,"ATTACK")==0) {
@@ -534,9 +603,13 @@ Kalau pemain belum masuk battle, beri peringatan.
                   int passiveOn = (eq.hasPassive && randRange(1,100)<=20);
 
 Tentukan senjata yang dipakai.
+
 Hitung damage:
+
 Bonus acak dari 0–base.
+
 Peluang kritikal 10% → damage x2.
+
 Jika senjata punya passive, 20% peluang efek aktif.
 
                   enemyHp[cid] -= dmg;
@@ -547,6 +620,7 @@ Jika senjata punya passive, 20% peluang efek aktif.
                   }
 
 Kurangi HP musuh.
+
 Kalau musuh mati, tambahkan gold dan kill count.
 
                   char line[BUF_SIZE];
@@ -568,8 +642,11 @@ Kalau musuh mati, tambahkan gold dan kill count.
           }
 
 Buat pesan hasil serangan: jumlah damage, apakah critical, efek passive, hasil kill.
+
 Jika musuh mati, panggil spawnEnemy() lagi → muncul musuh baru.
+
 Tambahkan HP bar musuh baru.
+
 Kirim ke klien.
         
           else if (strcmp(cmd,"EXIT_BATTLE")==0) {
@@ -579,7 +656,9 @@ Kirim ke klien.
           }
 
 Menyatakan bahwa pemain ingin kabur dari pertempuran.
+
 Set inBattle[cid] = 0 agar status keluar dari battle.
+
 Kirim pesan "Exited Battle mode." ke klien
         
           else if (strcmp(cmd,"EXIT")==0) {
@@ -602,11 +681,11 @@ Jika ada command yang tidak dikenal, maka dibalas dengan pesan "Unknown command.
 
 Keluar dari loop, socket klien ditutup menggunakan close() untuk membebaskan sumber daya dan menulis Client Disconnected.
 
-  // Struct untuk argumen thread
-  typedef struct {
-      int sock;
-      int cid;
-  } ClientArgs;
+    // Struct untuk argumen thread
+    typedef struct {
+        int sock;
+        int cid;
+    } ClientArgs;
 
 sock
 Menyimpan descriptor socket (clientSock) yang akan dipakai untuk komunikasi dengan satu klien.
@@ -635,11 +714,12 @@ Setelah handle_client selesai (klien disconnect), memori args (yang dialokasikan
 Return
 NULL karena fungsi thread tidak perlu mengembalikan data apapun.
 
-  //Server
-  int main() {
-      srand((unsigned)time(NULL));
+    //Server
+    int main() {
+        srand((unsigned)time(NULL));
 
 Seed RNG
+
 Untuk memastikan setiap run rand() menghasilkan urutan berbeda.
 
       int serverFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -653,8 +733,11 @@ Untuk memastikan setiap run rand() menghasilkan urutan berbeda.
       printf("[SERVER] Listening on port %d...\n", PORT);
 
 socket(): Buat TCP socket.
+
 bind(): Kaitkan socket ke PORT pada semua interface (INADDR_ANY).
+
 listen(): Siapkan antrian koneksi hingga MAX_CLIENTS.
+
 Cetak status bahwa server sudah berjalan.
 
       for (int cid=0; cid<MAX_CLIENTS; cid++) {
