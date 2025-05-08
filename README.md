@@ -11,7 +11,788 @@ Abiyyu Raihan Putra Wikanto - 5027241042
 ============[Laporan Resmi Penjelasan Soal]=============
 
 #soal_1
+Pada soal ini, kita diminta untuk membuat sistem RPC (Remote Procedure Call) server-client yang dapat mengubah text file menjadi file JPEG. Server berjalan sebagai daemon di background dan client menyediakan menu interaktif untuk mengirim file text untuk didekripsi dan mengunduh file hasil.
+Solusi yang diimplementasikan terdiri dari dua program utama:
+-> image_server.c - Program server yang berjalan sebagai daemon
+-> image_client.c - Program client dengan menu interaktif
 
+A. Program Server (image_server.c)
+
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <errno.h>
+    #include <signal.h>
+    #include <fcntl.h>
+    #include <sys/stat.h>
+    #include <time.h>
+    
+    #define PORT 8080
+    #define BUFFER_SIZE 65536
+    #define PATH_MAX_LEN 1024
+    
+    // Mode daemon (0 = daemon, 1 = debug mode)
+    #define DEBUG_MODE 0
+
+Kode di atas berisi:
+
+- Berbagai header yang diperlukan untuk operasi file, socket, dan sistem
+- Definisi konstanta untuk port, ukuran buffer, dan panjang path maksimum
+- Definisi mode DEBUG untuk memudahkan debugging (jika diset ke 1, server tidak berjalan sebagai daemon)
+
+    char* reverse_text(const char* input) {
+        int len = strlen(input);
+        char* reversed = malloc(len + 1);
+        
+        for (int i = 0; i < len; i++) {
+            reversed[i] = input[len - i - 1];
+        }
+        reversed[len] = '\0';
+        
+        return reversed;
+    }
+
+Fungsi ini:
+
+- Menerima string input
+- Membalikkan urutan karakter (karakter terakhir menjadi pertama, dst)
+- Mengembalikan string hasil pembalikan
+- Ini adalah langkah pertama dari proses dekripsi file
+
+int hex_to_int(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+    // Fungsi untuk decode dari hex ke binary
+    unsigned char* decode_hex(const char* hex_str, size_t* out_len) {
+        size_t len = strlen(hex_str);
+        *out_len = len / 2;
+        unsigned char* result = malloc(*out_len);
+        
+        for (size_t i = 0; i < len; i += 2) {
+            if (i + 1 >= len) break;
+            int high = hex_to_int(hex_str[i]);
+            int low = hex_to_int(hex_str[i+1]);
+            
+            if (high == -1 || low == -1) {
+                free(result);
+                *out_len = 0;
+                return NULL;
+            }
+            
+            result[i/2] = (high << 4) | low;
+        }
+        
+        return result;
+    }
+Kedua fungsi ini:
+
+hex_to_int: Mengubah karakter hex ('0'-'9', 'a'-'f', 'A'-'F') menjadi nilai integer (0-15)
+decode_hex: Mengubah string hex menjadi data binary, dengan setiap dua karakter hex menjadi satu byte data
+Ini adalah langkah kedua dari proses dekripsi file
+
+    void write_log(const char* source, const char* action, const char* info) {
+        time_t now = time(NULL);
+        struct tm *t = localtime(&now);
+        char timestamp[64];
+        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
+        
+        // Buat direktori server jika belum ada
+        mkdir("server", 0755);
+        
+        // Buat file log langsung di direktori server
+        FILE* logfile = fopen("server/server.log", "a");
+        if (!logfile) {
+            if (DEBUG_MODE) {
+                printf("Failed to open log file: %s\n", strerror(errno));
+            }
+            return;
+        }
+        
+        fprintf(logfile, "[%s][%s]: [%s] [%s]\n", source, timestamp, action, info);
+        fclose(logfile);
+        
+        if (DEBUG_MODE) {
+            printf("[%s][%s]: [%s] [%s]\n", source, timestamp, action, info);
+        }
+    }
+Fungsi ini:
+
+Mendapatkan timestamp saat ini
+Membuka file log di direktori server
+Menulis log dengan format: [Source][YYYY-MM-DD hh:mm:ss]: [ACTION] [Info]
+Dalam mode debug, juga mencetak log ke console
+
+    char* save_decoded_file(const char* text_data) {
+        time_t now = time(NULL);
+        static char filename[64];
+        snprintf(filename, sizeof(filename), "%ld.jpeg", now);
+        
+        // Step 1: Reverse text
+        char* reversed = reverse_text(text_data);
+        
+        // Step 2: Decode dari hex ke binary
+        size_t decoded_len;
+        unsigned char* decoded = decode_hex(reversed, &decoded_len);
+        
+        if (!decoded) {
+            free(reversed);
+            return "ERROR: Failed to decode hex data";
+        }
+        
+        // Pastikan direktori database ada
+        mkdir("server", 0755);
+        mkdir("server/database", 0755);
+        
+        // Buat path file output
+        char filepath[PATH_MAX_LEN];
+        snprintf(filepath, PATH_MAX_LEN, "server/database/%s", filename);
+        
+        // Buka file untuk menulis dalam mode binary
+        FILE* outfile = fopen(filepath, "wb");
+        if (!outfile) {
+            free(reversed);
+            free(decoded);
+            return "ERROR: Failed to create output file";
+        }
+        
+        // Tulis hasil decode ke file
+        fwrite(decoded, 1, decoded_len, outfile);
+        fclose(outfile);
+        
+        free(reversed);
+        free(decoded);
+        
+        return filename;
+    }
+
+Fungsi ini:
+
+Membuat nama file berdasarkan timestamp saat ini
+Melakukan proses dekripsi: Reverse Text dan Decode Hex
+Menyimpan hasil dekripsi sebagai file JPEG di direktori server/database/
+Mengembalikan nama file yang disimpan atau pesan error jika gagal
+
+    char* get_file(const char* filename, size_t* size) {
+        // Buat path file
+        char filepath[PATH_MAX_LEN];
+        snprintf(filepath, PATH_MAX_LEN, "server/database/%s", filename);
+        
+        // Buka file
+        FILE* file = fopen(filepath, "rb");
+        if (!file) {
+            *size = 0;
+            return NULL;
+        }
+        
+        // Cari ukuran file
+        fseek(file, 0, SEEK_END);
+        long file_size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        
+        // Alokasi memori
+        char* buffer = malloc(file_size);
+        if (!buffer) {
+            fclose(file);
+            *size = 0;
+            return NULL;
+        }
+        
+        // Baca file
+        size_t bytes_read = fread(buffer, 1, file_size, file);
+        fclose(file);
+        
+        *size = bytes_read;
+        return buffer;
+    }
+
+Fungsi ini:
+
+Membuka file JPEG dari direktori server/database/
+Membaca seluruh konten file ke dalam memory buffer
+Mengembalikan buffer dan ukuran file, atau NULL jika file tidak ditemukan
+
+    void daemonize() {
+        if (DEBUG_MODE) {
+            printf("Debug mode active - not daemonizing\n");
+            return;
+        }
+        
+        pid_t pid, sid;
+        
+        // Fork dan exit parent process
+        pid = fork();
+        if (pid < 0) exit(EXIT_FAILURE);
+        if (pid > 0) exit(EXIT_SUCCESS);
+        
+        // Set umask
+        umask(0);
+        
+        // Buat session ID baru
+        sid = setsid();
+        if (sid < 0) exit(EXIT_FAILURE);
+        
+        // Tutup file descriptor standar
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        
+        // Ignore certain signals
+        signal(SIGCHLD, SIG_IGN);
+        signal(SIGHUP, SIG_IGN);
+    }
+
+Fungsi ini:
+
+Mengubah program menjadi daemon yang berjalan di background
+Melakukan fork untuk memisahkan dari terminal
+Membuat session ID baru
+Menutup semua file descriptor standar
+Mengabaikan beberapa signal yang tidak diperlukan
+
+    int main() {
+        int server_fd, new_socket;
+        struct sockaddr_in address;
+        int opt = 1;
+        int addrlen = sizeof(address);
+        char buffer[BUFFER_SIZE] = {0};
+        
+        // Buat direktori yang diperlukan
+        mkdir("server", 0755);
+        mkdir("server/database", 0755);
+        
+        // Buat socket
+        if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+            perror("socket failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Set socket options
+        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+            perror("setsockopt");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Bind socket ke port
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        address.sin_port = htons(PORT);
+        
+        if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+            perror("bind failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Listen untuk koneksi
+        if (listen(server_fd, 3) < 0) {
+            perror("listen");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Jalankan sebagai daemon
+        daemonize();
+        
+        // Loop untuk menerima koneksi
+        while (1) {
+            if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+                continue;
+            }
+            
+            // Fork untuk menangani klien baru
+            pid_t pid = fork();
+            
+            if (pid < 0) {
+                close(new_socket);
+                continue;
+            }
+            
+            if (pid == 0) { // Child process
+                close(server_fd);
+                
+                // Terima command
+                int bytes_read = read(new_socket, buffer, BUFFER_SIZE);
+                if (bytes_read <= 0) {
+                    close(new_socket);
+                    exit(0);
+                }
+                
+                // Parse command
+                buffer[bytes_read] = '\0';
+                
+                if (strncmp(buffer, "DECRYPT ", 8) == 0) {
+                    // Command DECRYPT: Decrypt dan simpan file
+                    char* text_data = buffer + 8;
+                    char* result = save_decoded_file(text_data);
+                    
+                    // Log
+                    write_log("Client", "DECRYPT", "Text data");
+                    if (strncmp(result, "ERROR", 5) != 0) {
+                        write_log("Server", "SAVE", result);
+                    }
+                    
+                    // Kirim hasil ke client
+                    send(new_socket, result, strlen(result), 0);
+                } 
+                else if (strncmp(buffer, "DOWNLOAD ", 9) == 0) {
+                    // Command DOWNLOAD: Kirim file ke client
+                    char* filename = buffer + 9;
+                    
+                    // Log
+                    write_log("Client", "DOWNLOAD", filename);
+                    
+                    // Ambil file
+                    size_t file_size;
+                    char* file_data = get_file(filename, &file_size);
+                    
+                    if (file_data) {
+                        // Log
+                        write_log("Server", "UPLOAD", filename);
+                        
+                        // Kirim ukuran file dulu
+                        char size_str[32];
+                        snprintf(size_str, sizeof(size_str), "%zu", file_size);
+                        send(new_socket, size_str, strlen(size_str), 0);
+                        
+                        // Tunggu konfirmasi dari client
+                        char ack[16];
+                        read(new_socket, ack, sizeof(ack));
+                        
+                        // Kirim file data
+                        send(new_socket, file_data, file_size, 0);
+                        free(file_data);
+                    } else {
+                        // File tidak ditemukan
+                        const char* error_msg = "ERROR: File not found";
+                        send(new_socket, error_msg, strlen(error_msg), 0);
+                    }
+                }
+                else if (strncmp(buffer, "EXIT", 4) == 0) {
+                    // Command EXIT: Log exit request
+                    write_log("Client", "EXIT", "Client requested to exit");
+                }
+                
+                close(new_socket);
+                exit(0);
+            }
+            
+            close(new_socket);
+        }
+        
+        return 0;
+    }
+
+Fungsi utama server:
+
+Menyiapkan socket untuk komunikasi
+Menjalankan program sebagai daemon (jika tidak dalam mode debug)
+Menjalankan loop tak terbatas untuk menerima koneksi dari client
+Untuk setiap koneksi, melakukan fork untuk menangani client
+Menerima dan memproses perintah dari client:
+
+DECRYPT [text]: Dekripsi text dan simpan sebagai JPEG
+DOWNLOAD [filename]: Kirim file JPEG ke client
+EXIT: Log permintaan keluar dari client
+Server tidak terminate saat terjadi error (error handling)
+
+B. Program Client (image_client.c)
+
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <sys/socket.h>
+    #include <arpa/inet.h>
+    #include <errno.h>
+    #include <sys/stat.h>
+    
+    #define PORT 8080
+    #define SERVER_IP "127.0.0.1"
+    #define BUFFER_SIZE 65536
+    #define PATH_MAX_LEN 1024
+
+Kode ini berisi:
+
+Header yang diperlukan untuk operasi file dan socket
+Definisi konstanta untuk port, IP server, ukuran buffer, dan panjang path maksimum
+
+    int connect_to_server() {
+        int sock = 0;
+        struct sockaddr_in serv_addr;
+        
+        // Buat socket
+        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            printf("Error: Socket creation failed: %s\n", strerror(errno));
+            return -1;
+        }
+        
+        // Set alamat server
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(PORT);
+        
+        // Convert IPv4 dan IPv6 addresses dari text ke binary
+        if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {
+            printf("Error: Invalid address/ Address not supported\n");
+            close(sock);
+            return -1;
+        }
+        
+        // Connect ke server
+        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+            printf("Error: Connection Failed. Server might not be running.\n");
+            close(sock);
+            return -1;
+        }
+        
+        return sock;
+    }
+Fungsi ini:
+
+Membuat socket untuk komunikasi dengan server
+Mengatur alamat server dan port
+Mencoba melakukan koneksi ke server
+Mengembalikan socket file descriptor jika berhasil, atau -1 jika gagal
+Menampilkan pesan error yang sesuai jika terjadi kesalahan
+
+    int send_file_to_server(const char* filename) {
+        char filepath[PATH_MAX_LEN];
+        
+        // Buat path dengan pengecekan panjang
+        if (strlen("client/secrets/") + strlen(filename) >= PATH_MAX_LEN) {
+            printf("Error: Filename too long\n");
+            return 0;
+        }
+        
+        strcpy(filepath, "client/secrets/");
+        strcat(filepath, filename);
+        
+        // Cek apakah file ada
+        if (!file_exists(filepath)) {
+            printf("Error: File '%s' not found\n", filepath);
+            return 0;
+        }
+        
+        FILE* file = fopen(filepath, "r");
+        if (!file) {
+            printf("Error: Failed to open file '%s': %s\n", filepath, strerror(errno));
+            return 0;
+        }
+        
+        // Baca isi file
+        fseek(file, 0, SEEK_END);
+        long file_size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        
+        if (file_size > BUFFER_SIZE - 10) {
+            printf("Error: File too large (max %d bytes)\n", BUFFER_SIZE - 10);
+            fclose(file);
+            return 0;
+        }
+        
+        char* text_data = malloc(file_size + 1);
+        if (!text_data) {
+            printf("Error: Memory allocation failed\n");
+            fclose(file);
+            return 0;
+        }
+        
+        size_t bytes_read = fread(text_data, 1, file_size, file);
+        text_data[bytes_read] = '\0';
+        fclose(file);
+        
+        // Connect to server
+        int sock = connect_to_server();
+        if (sock < 0) {
+            free(text_data);
+            return 0;
+        }
+        
+        // Prepare command
+        char* command = malloc(bytes_read + 10);
+        if (!command) {
+            printf("Error: Memory allocation failed\n");
+            free(text_data);
+            close(sock);
+            return 0;
+        }
+        
+        // Buat command dengan pengecekan buffer
+        if (bytes_read + 9 >= BUFFER_SIZE) {
+            printf("Error: Data too large for command buffer\n");
+            free(text_data);
+            free(command);
+            close(sock);
+            return 0;
+        }
+        
+        strcpy(command, "DECRYPT ");
+        strcat(command, text_data);
+        
+        // Send command to server
+        send(sock, command, strlen(command), 0);
+        
+        // Receive response
+        char response[256];
+        int response_len = read(sock, response, sizeof(response) - 1);
+        
+        if (response_len <= 0) {
+            printf("Error: Failed to receive response from server\n");
+            free(text_data);
+            free(command);
+            close(sock);
+            return 0;
+        }
+        
+        response[response_len] = '\0';
+        
+        if (strncmp(response, "ERROR", 5) == 0) {
+            printf("Server: %s\n", response);
+            free(text_data);
+            free(command);
+            close(sock);
+            return 0;
+        }
+        
+        printf("Server: Text decrypted and saved as %s\n", response);
+        
+        free(text_data);
+        free(command);
+        close(sock);
+        return 1;
+    }
+Fungsi ini:
+
+Membentuk path lengkap ke file input di client/secrets/
+Memeriksa keberadaan file dan membuka file
+Membaca seluruh konten file ke dalam memory
+Membuat koneksi ke server
+Mengirim perintah "DECRYPT" beserta data file ke server
+Menerima dan memproses respons dari server
+Menampilkan pesan sukses atau error sesuai respons server
+
+    int download_file_from_server(const char* filename) {
+        // Connect to server
+        int sock = connect_to_server();
+        if (sock < 0) {
+            return 0;
+        }
+        
+        // Prepare command
+        char command[PATH_MAX_LEN];
+        
+        // Cek panjang command
+        if (strlen("DOWNLOAD ") + strlen(filename) >= PATH_MAX_LEN) {
+            printf("Error: Filename too long\n");
+            close(sock);
+            return 0;
+        }
+        
+        strcpy(command, "DOWNLOAD ");
+        strcat(command, filename);
+        
+        // Send command to server
+        send(sock, command, strlen(command), 0);
+        
+        // Get file size first
+        char size_str[32];
+        int bytes_read = read(sock, size_str, sizeof(size_str) - 1);
+        
+        if (bytes_read <= 0) {
+            printf("Error: Failed to receive response from server\n");
+            close(sock);
+            return 0;
+        }
+        
+        size_str[bytes_read] = '\0';
+        
+        // Check if there's an error
+        if (strncmp(size_str, "ERROR", 5) == 0) {
+            printf("Server: %s\n", size_str);
+            close(sock);
+            return 0;
+        }
+        
+        // Parse file size
+        size_t file_size = atol(size_str);
+        
+        // Send ACK
+        send(sock, "ACK", 3, 0);
+        
+        // Allocate buffer for file
+        char* file_buffer = malloc(file_size);
+        if (!file_buffer) {
+            printf("Error: Memory allocation failed\n");
+            close(sock);
+            return 0;
+        }
+        
+        // Receive file data
+        size_t total_received = 0;
+        while (total_received < file_size) {
+            ssize_t received = read(sock, file_buffer + total_received, file_size - total_received);
+            if (received <= 0) break;
+            total_received += received;
+        }
+        
+        // Make sure client directory exists
+        mkdir("client", 0755);
+        
+        // Save file
+        char filepath[PATH_MAX_LEN];
+        
+        // Cek panjang path
+        if (strlen("client/") + strlen(filename) >= PATH_MAX_LEN) {
+            printf("Error: Filename too long\n");
+            free(file_buffer);
+            close(sock);
+            return 0;
+        }
+        
+        strcpy(filepath, "client/");
+        strcat(filepath, filename);
+        
+        FILE* file = fopen(filepath, "wb");
+        if (!file) {
+            printf("Error: Cannot create file %s: %s\n", filepath, strerror(errno));
+            free(file_buffer);
+            close(sock);
+            return 0;
+        }
+        
+        fwrite(file_buffer, 1, total_received, file);
+        fclose(file);
+        
+        printf("Success! Image saved as %s\n", filepath);
+        
+        free(file_buffer);
+        close(sock);
+        return 1;
+    }
+    
+Fungsi ini:
+
+Membuat koneksi ke server
+Mengirim perintah "DOWNLOAD" beserta nama file ke server
+Menerima ukuran file dari server
+Mengalokasikan buffer sesuai ukuran file
+Menerima data file dari server
+Menyimpan file ke direktori client/
+Menampilkan pesan sukses atau error sesuai
+
+    int main() {
+        int choice;
+        char filename[256];
+        
+        // Buat direktori client jika belum ada
+        mkdir("client", 0755);
+        mkdir("client/secrets", 0755);
+        
+        // Cek apakah ada file di client/secrets
+        FILE* check_dir = popen("ls -1 client/secrets/ | grep -c '^input'", "r");
+        if (check_dir) {
+            char result[16];
+            if (fgets(result, sizeof(result), check_dir) != NULL) {
+                int count = atoi(result);
+                if (count == 0) {
+                    printf("Warning: No input files found in client/secrets/ directory!\n");
+                    printf("Please add the input_*.txt files to that directory.\n");
+                } else {
+                    printf("Found %d input files in client/secrets/\n", count);
+                }
+            }
+            pclose(check_dir);
+        }
+        
+        // Cek koneksi ke server
+        int test_sock = connect_to_server();
+        if (test_sock < 0) {
+            printf("Warning: Could not connect to server at %s:%d\n", SERVER_IP, PORT);
+            printf("The server might not be running. Please start the server first.\n");
+            printf("Continuing anyway...\n\n");
+        } else {
+            close(test_sock);
+            printf("Connected to address %s:%d\n", SERVER_IP, PORT);
+        }
+        
+        while (1) {
+            display_header();
+            display_menu();
+            
+            if (scanf("%d", &choice) != 1) {
+                // Jika input bukan angka
+                printf("Invalid input. Please enter a number.\n");
+                // Bersihkan buffer input
+                int c;
+                while ((c = getchar()) != '\n' && c != EOF);
+                continue;
+            }
+            getchar(); // Flush newline
+            
+            switch (choice) {
+                case 1:
+                    printf("Enter the file name: ");
+                    scanf("%s", filename);
+                    getchar(); // Flush newline
+                    
+                    if (send_file_to_server(filename)) {
+                        printf("File sent successfully\n");
+                    }
+                    break;
+                    
+                case 2:
+                    printf("Enter the file name: ");
+                    scanf("%s", filename);
+                    getchar(); // Flush newline
+                    
+                    if (download_file_from_server(filename)) {
+                        printf("File downloaded successfully\n");
+                    }
+                    break;
+                    
+                case 3:
+                    printf("Exiting...\n");
+                    // Notify server if possible
+                    int exit_sock = connect_to_server();
+                    if (exit_sock >= 0) {
+                        send(exit_sock, "EXIT", 4, 0);
+                        close(exit_sock);
+                    }
+                    return 0;
+                    
+                default:
+                    printf("Invalid option. Please try again.\n");
+            }
+            
+            printf("\nPress Enter to continue...");
+            getchar();
+            clear_screen();
+        }
+        
+        return 0;
+    }
+
+Fungsi utama client:
+
+Membuat direktori yang diperlukan (client/ dan client/secrets/)
+Memeriksa ketersediaan file input
+Memeriksa koneksi ke server
+Menjalankan loop untuk menampilkan menu dan memproses pilihan user
+Opsi menu:
+
+Kirim file teks untuk didekripsi
+Unduh file JPEG hasil dekripsi
+Keluar
+
+
+Setiap pilihan memanggil fungsi yang sesuai
+Notifikasi ke server saat client keluar
 #soal_2
 
 #soal_3
