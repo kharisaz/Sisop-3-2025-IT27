@@ -45,8 +45,8 @@ Kode di atas berisi:
 - Definisi konstanta untuk port, ukuran buffer, dan panjang path maksimum
 - Definisi mode DEBUG untuk memudahkan debugging (jika diset ke 1, server tidak berjalan sebagai daemon)
 
-    // Fungsi untuk membalik teks (reverse text)
-    char* reverse_text(const char* input) {
+        // Fungsi untuk membalik teks (reverse text)
+        char* reverse_text(const char* input) {
         int len = strlen(input);
         char* reversed = malloc(len + 1);
         
@@ -56,7 +56,7 @@ Kode di atas berisi:
         reversed[len] = '\0';
         
         return reversed;
-    }
+        }
   
 Fungsi ini:
 
@@ -65,12 +65,12 @@ Fungsi ini:
 - Mengembalikan string hasil pembalikan
 - Ini adalah langkah pertama dari proses dekripsi file
 
-int hex_to_int(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-}
+    int hex_to_int(char c) {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    }
 
     // Fungsi untuk decode dari hex ke binary
     unsigned char* decode_hex(const char* hex_str, size_t* out_len) {
