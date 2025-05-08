@@ -797,6 +797,7 @@ Setiap pilihan memanggil fungsi yang sesuai
 Notifikasi ke server saat client keluar
 
 #soal_2
+
 Pada soal nomor 2, kami diminta untuk membuat Delivery Management System untuk perusahaan ekspedisi RushGo. Sistem ini menangani dua jenis pengiriman: Express (otomatis) dan Reguler (manual). Implementasi melibatkan dua program utama: dispatcher.c dan delivery_agent.c yang saling berkomunikasi menggunakan shared memory.
 
 Dalam mengimplementasikan sistem ini, kami menggunakan beberapa konsep dan teknik pemrograman sistem operasi:
@@ -808,22 +809,23 @@ Dalam mengimplementasikan sistem ini, kami menggunakan beberapa konsep dan tekni
 Penjelasan Kode Program
 1. Struktur Data Utama
 Berikut adalah struktur data yang digunakan dalam kedua program:
-
-     // Struktur untuk menyimpan data pesanan
-            typedef struct {
-                char nama[50];
-                char alamat[100];
-                char tipe[20]; // "Express" atau "Reguler"
-                bool terkirim;
-                char dikirimOleh[20]; // Nama agen yang mengirim
-            } Pesanan;
-            
-            // Struktur untuk shared memory
-            typedef struct {
-                int jumlahPesanan;
-                Pesanan pesanan[MAX_ORDERS];
-            } SharedData;
-   
+    
+    
+         // Struktur untuk menyimpan data pesanan
+                typedef struct {
+                    char nama[50];
+                    char alamat[100];
+                    char tipe[20]; // "Express" atau "Reguler"
+                    bool terkirim;
+                    char dikirimOleh[20]; // Nama agen yang mengirim
+                } Pesanan;
+                
+                // Struktur untuk shared memory
+                typedef struct {
+                    int jumlahPesanan;
+                    Pesanan pesanan[MAX_ORDERS];
+                } SharedData;
+       
 Penjelasan:
 
 Pesanan: Menyimpan detail setiap pesanan seperti nama penerima, alamat, tipe pengiriman, status pengiriman, dan nama agen pengirim
