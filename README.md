@@ -44,18 +44,18 @@ Kode di atas berisi:
 - Berbagai header yang diperlukan untuk operasi file, socket, dan sistem
 - Definisi konstanta untuk port, ukuran buffer, dan panjang path maksimum
 - Definisi mode DEBUG untuk memudahkan debugging (jika diset ke 1, server tidak berjalan sebagai daemon)
-
     char* reverse_text(const char* input) {
-        int len = strlen(input);
-        char* reversed = malloc(len + 1);
-        
-        for (int i = 0; i < len; i++) {
-            reversed[i] = input[len - i - 1];
-        }
-        reversed[len] = '\0';
-        
-        return reversed;
-    }
+                int len = strlen(input);
+                char* reversed = malloc(len + 1);
+                
+                for (int i = 0; i < len; i++) {
+                    reversed[i] = input[len - i - 1];
+                }
+                reversed[len] = '\0';
+                
+                return reversed;
+            }    
+            
 
 Fungsi ini:
 
