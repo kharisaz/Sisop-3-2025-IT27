@@ -808,20 +808,22 @@ Dalam mengimplementasikan sistem ini, kami menggunakan beberapa konsep dan tekni
 Penjelasan Kode Program
 1. Struktur Data Utama
 Berikut adalah struktur data yang digunakan dalam kedua program:
-        // Struktur untuk menyimpan data pesanan
-        typedef struct {
-            char nama[50];
-            char alamat[100];
-            char tipe[20]; // "Express" atau "Reguler"
-            bool terkirim;
-            char dikirimOleh[20]; // Nama agen yang mengirim
-        } Pesanan;
-        
-        // Struktur untuk shared memory
-        typedef struct {
-            int jumlahPesanan;
-            Pesanan pesanan[MAX_ORDERS];
-        } SharedData;
+
+     // Struktur untuk menyimpan data pesanan
+            typedef struct {
+                char nama[50];
+                char alamat[100];
+                char tipe[20]; // "Express" atau "Reguler"
+                bool terkirim;
+                char dikirimOleh[20]; // Nama agen yang mengirim
+            } Pesanan;
+            
+            // Struktur untuk shared memory
+            typedef struct {
+                int jumlahPesanan;
+                Pesanan pesanan[MAX_ORDERS];
+            } SharedData;
+   
 Penjelasan:
 
 Pesanan: Menyimpan detail setiap pesanan seperti nama penerima, alamat, tipe pengiriman, status pengiriman, dan nama agen pengirim
@@ -829,49 +831,52 @@ SharedData: Menyimpan array pesanan dan jumlah total pesanan untuk disimpan dala
 
 2. Program dispatcher.c
 Inisialisasi Shared Memory
-        // Buat atau dapatkan shared memory
-        int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666 | IPC_CREAT);
-        if (shmid == -1) {
-            perror("shmget");
-            exit(EXIT_FAILURE);
-        }
-        
-        // Attach shared memory
-        SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
-        if (sharedData == (void *)-1) {
-            perror("shmat");
-            exit(EXIT_FAILURE);
-        }
+
+     // Buat atau dapatkan shared memory
+            int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666 | IPC_CREAT);
+            if (shmid == -1) {
+                perror("shmget");
+                exit(EXIT_FAILURE);
+            }
+            
+            // Attach shared memory
+            SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
+            if (sharedData == (void *)-1) {
+                perror("shmat");
+                exit(EXIT_FAILURE);
+            }
+
 Penjelasan:
 
 shmget(): Menciptakan atau mendapatkan segment shared memory dengan key dan ukuran tertentu
 shmat(): Mengaitkan (attach) shared memory ke ruang alamat proses saat ini, mengembalikan pointer ke area shared memory
 
 Pengunduhan dan Pemrosesan File CSV
+
     cint unduhCSV() {
-        // Coba wget dulu
-        char wget_cmd[512];
-        sprintf(wget_cmd, "wget -q -O %s \"%s\"", CSV_FILE, CSV_URL);
-        
-        int wget_result = system(wget_cmd);
-        if (wget_result == 0) {
-            printf("Berhasil mengunduh file CSV menggunakan wget\n");
-            return 1;
+            // Coba wget dulu
+            char wget_cmd[512];
+            sprintf(wget_cmd, "wget -q -O %s \"%s\"", CSV_FILE, CSV_URL);
+            
+            int wget_result = system(wget_cmd);
+            if (wget_result == 0) {
+                printf("Berhasil mengunduh file CSV menggunakan wget\n");
+                return 1;
+            }
+            
+            // Jika wget gagal, coba curl
+            char curl_cmd[512];
+            sprintf(curl_cmd, "curl -s -L \"%s\" -o %s", CSV_URL, CSV_FILE);
+            
+            int curl_result = system(curl_cmd);
+            if (curl_result == 0) {
+                printf("Berhasil mengunduh file CSV menggunakan curl\n");
+                return 1;
+            }
+            
+            printf("Gagal mengunduh file CSV. Coba buat file contoh...\n");
+            return 0;
         }
-        
-        // Jika wget gagal, coba curl
-        char curl_cmd[512];
-        sprintf(curl_cmd, "curl -s -L \"%s\" -o %s", CSV_URL, CSV_FILE);
-        
-        int curl_result = system(curl_cmd);
-        if (curl_result == 0) {
-            printf("Berhasil mengunduh file CSV menggunakan curl\n");
-            return 1;
-        }
-        
-        printf("Gagal mengunduh file CSV. Coba buat file contoh...\n");
-        return 0;
-    }
 Penjelasan:
 
 Fungsi ini menggunakan system() untuk menjalankan perintah wget atau curl untuk mengunduh file CSV
@@ -879,59 +884,60 @@ Program mencoba wget terlebih dahulu, jika gagal maka mencoba curl
 Jika kedua metode gagal, program akan membuat file CSV contoh
 
 Memuat Data dari CSV ke Shared Memory
-    cint muatDataDariCSV(SharedData *sharedData) {
-        FILE *fp = fopen(CSV_FILE, "r");
-        if (fp == NULL) {
-            printf("File CSV tidak ditemukan. Mencoba unduh...\n");
-            
-            if (!unduhCSV()) {
-                buatContohCSV();
-            }
-            
-            fp = fopen(CSV_FILE, "r");
+
+     cint muatDataDariCSV(SharedData *sharedData) {
+            FILE *fp = fopen(CSV_FILE, "r");
             if (fp == NULL) {
-                printf("Error: Masih tidak bisa membuka file CSV\n");
-                return 0;
+                printf("File CSV tidak ditemukan. Mencoba unduh...\n");
+                
+                if (!unduhCSV()) {
+                    buatContohCSV();
+                }
+                
+                fp = fopen(CSV_FILE, "r");
+                if (fp == NULL) {
+                    printf("Error: Masih tidak bisa membuka file CSV\n");
+                    return 0;
+                }
             }
+            
+            char line[256];
+            int count = 0;
+            
+            // Skip header
+            fgets(line, sizeof(line), fp);
+            
+            while (fgets(line, sizeof(line), fp) && count < MAX_ORDERS) {
+                char *token;
+                
+                // Ambil nama
+                token = strtok(line, ",");
+                if (token == NULL) continue;
+                strncpy(sharedData->pesanan[count].nama, token, sizeof(sharedData->pesanan[count].nama) - 1);
+                
+                // Ambil alamat
+                token = strtok(NULL, ",");
+                if (token == NULL) continue;
+                strncpy(sharedData->pesanan[count].alamat, token, sizeof(sharedData->pesanan[count].alamat) - 1);
+                
+                // Ambil tipe
+                token = strtok(NULL, ",\n");
+                if (token == NULL) continue;
+                strncpy(sharedData->pesanan[count].tipe, token, sizeof(sharedData->pesanan[count].tipe) - 1);
+                
+                // Inisialisasi status pengiriman
+                sharedData->pesanan[count].terkirim = false;
+                strcpy(sharedData->pesanan[count].dikirimOleh, "");
+                
+                count++;
+            }
+            
+            sharedData->jumlahPesanan = count;
+            fclose(fp);
+            
+            printf("Berhasil memuat %d pesanan dari file CSV\n", count);
+            return 1;
         }
-        
-        char line[256];
-        int count = 0;
-        
-        // Skip header
-        fgets(line, sizeof(line), fp);
-        
-        while (fgets(line, sizeof(line), fp) && count < MAX_ORDERS) {
-            char *token;
-            
-            // Ambil nama
-            token = strtok(line, ",");
-            if (token == NULL) continue;
-            strncpy(sharedData->pesanan[count].nama, token, sizeof(sharedData->pesanan[count].nama) - 1);
-            
-            // Ambil alamat
-            token = strtok(NULL, ",");
-            if (token == NULL) continue;
-            strncpy(sharedData->pesanan[count].alamat, token, sizeof(sharedData->pesanan[count].alamat) - 1);
-            
-            // Ambil tipe
-            token = strtok(NULL, ",\n");
-            if (token == NULL) continue;
-            strncpy(sharedData->pesanan[count].tipe, token, sizeof(sharedData->pesanan[count].tipe) - 1);
-            
-            // Inisialisasi status pengiriman
-            sharedData->pesanan[count].terkirim = false;
-            strcpy(sharedData->pesanan[count].dikirimOleh, "");
-            
-            count++;
-        }
-        
-        sharedData->jumlahPesanan = count;
-        fclose(fp);
-        
-        printf("Berhasil memuat %d pesanan dari file CSV\n", count);
-        return 1;
-    }
 Penjelasan:
 
 Membuka file CSV dan membaca baris per baris
@@ -941,24 +947,26 @@ Menginisialisasi status pengiriman dan pengirim untuk setiap pesanan
 Menyimpan jumlah total pesanan di shared memory
 
 Pengiriman Paket Reguler
-    cvoid kirimPesananReguler(SharedData *sharedData, char *nama, char *namaUser) {
-        for (int i = 0; i < sharedData->jumlahPesanan; i++) {
-            if (strcmp(sharedData->pesanan[i].nama, nama) == 0 && 
-                strcmp(sharedData->pesanan[i].tipe, "Reguler") == 0 && 
-                !sharedData->pesanan[i].terkirim) {
-                
-                sharedData->pesanan[i].terkirim = true;
-                sprintf(sharedData->pesanan[i].dikirimOleh, "%s", namaUser);
-                
-                tambahLog(namaUser, nama, sharedData->pesanan[i].alamat, "Reguler");
-                
-                printf("Pesanan Reguler untuk %s berhasil dikirim oleh Agent %s\n", nama, namaUser);
-                return;
+
+     cvoid kirimPesananReguler(SharedData *sharedData, char *nama, char *namaUser) {
+            for (int i = 0; i < sharedData->jumlahPesanan; i++) {
+                if (strcmp(sharedData->pesanan[i].nama, nama) == 0 && 
+                    strcmp(sharedData->pesanan[i].tipe, "Reguler") == 0 && 
+                    !sharedData->pesanan[i].terkirim) {
+                    
+                    sharedData->pesanan[i].terkirim = true;
+                    sprintf(sharedData->pesanan[i].dikirimOleh, "%s", namaUser);
+                    
+                    tambahLog(namaUser, nama, sharedData->pesanan[i].alamat, "Reguler");
+                    
+                    printf("Pesanan Reguler untuk %s berhasil dikirim oleh Agent %s\n", nama, namaUser);
+                    return;
+                }
             }
+            
+            printf("Error: Tidak menemukan pesanan Reguler dengan nama %s\n", nama);
         }
         
-        printf("Error: Tidak menemukan pesanan Reguler dengan nama %s\n", nama);
-    }
 Penjelasan:
 
 Mencari pesanan dengan nama tertentu dalam shared memory
