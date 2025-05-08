@@ -65,19 +65,19 @@ Fungsi ini:
 - Mengembalikan string hasil pembalikan
 - Ini adalah langkah pertama dari proses dekripsi file
 
-    int hex_to_int(char c) {
-        if (c >= '0' && c <= '9') return c - '0';
-        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-        return -1;
-    }
-
-    // Fungsi untuk decode dari hex ke binary
-    unsigned char* decode_hex(const char* hex_str, size_t* out_len) {
-        size_t len = strlen(hex_str);
-        *out_len = len / 2;
-        unsigned char* result = malloc(*out_len);
-        
+        int hex_to_int(char c) {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        }
+    
+        // Fungsi untuk decode dari hex ke binary
+        unsigned char* decode_hex(const char* hex_str, size_t* out_len) {
+            size_t len = strlen(hex_str);
+            *out_len = len / 2;
+            unsigned char* result = malloc(*out_len);
+            
         for (size_t i = 0; i < len; i += 2) {
             if (i + 1 >= len) break;
             int high = hex_to_int(hex_str[i]);
@@ -94,6 +94,7 @@ Fungsi ini:
         
         return result;
     }
+  
 Kedua fungsi ini:
 
 hex_to_int: Mengubah karakter hex ('0'-'9', 'a'-'f', 'A'-'F') menjadi nilai integer (0-15)
