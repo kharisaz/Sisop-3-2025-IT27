@@ -1233,6 +1233,8 @@ Penjelasan:
 Mencatat setiap pengiriman ke file log dengan format yang telah ditentukan
 Menggunakan time() dan localtime() untuk mendapatkan timestamp saat ini
 Format log: [dd/mm/yyyy hh:mm:ss] [AGENT X] Type package delivered to [Nama] in [Alamat]
+
+
 #soal_3
 Untuk soal ini, kami diminta untuk membuat server dengan gim yang terdiri dari dungeon.c, player.c, shop.h/shop.c.
 
