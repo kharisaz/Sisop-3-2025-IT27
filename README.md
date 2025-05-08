@@ -796,6 +796,7 @@ Keluar
 Setiap pilihan memanggil fungsi yang sesuai
 Notifikasi ke server saat client keluar
 
+
 #soal_2
 
 Pada soal nomor 2, kami diminta untuk membuat Delivery Management System untuk perusahaan ekspedisi RushGo. Sistem ini menangani dua jenis pengiriman: Express (otomatis) dan Reguler (manual). Implementasi melibatkan dua program utama: dispatcher.c dan delivery_agent.c yang saling berkomunikasi menggunakan shared memory.
@@ -1236,6 +1237,7 @@ Format log: [dd/mm/yyyy hh:mm:ss] [AGENT X] Type package delivered to [Nama] in 
 
 
 #soal_3
+
 Untuk soal ini, kami diminta untuk membuat server dengan gim yang terdiri dari dungeon.c, player.c, shop.h/shop.c.
 
 shop.h
