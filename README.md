@@ -57,6 +57,7 @@ Kode di atas berisi:
         
         return reversed;
     }
+  
 Fungsi ini:
 
 - Menerima string input
