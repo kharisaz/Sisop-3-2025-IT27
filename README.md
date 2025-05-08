@@ -979,38 +979,40 @@ Menambahkan log pengiriman ke file log
 Jika tidak ditemukan, menampilkan pesan error
 
 Command Line Interface
-    // Periksa argumen command line
-    if (argc > 1) {
-        if (strcmp(argv[1], "-deliver") == 0 && argc == 3) {
-            // Kirim pesanan Reguler
-            char username[256];
-            // Gunakan nama "Arkan" sebagai nama agen pengirim
-            strcpy(username, "Arkan");
-            kirimPesananReguler(sharedData, argv[2], username);
-        } else if (strcmp(argv[1], "-status") == 0 && argc == 3) {
-            // Cek status pesanan
-            cekStatus(sharedData, argv[2]);
-        } else if (strcmp(argv[1], "-list") == 0) {
-            // Tampilkan semua pesanan
-            tampilkanDaftarPesanan(sharedData);
+    
+     // Periksa argumen command line
+        if (argc > 1) {
+            if (strcmp(argv[1], "-deliver") == 0 && argc == 3) {
+                // Kirim pesanan Reguler
+                char username[256];
+                // Gunakan nama "Arkan" sebagai nama agen pengirim
+                strcpy(username, "Arkan");
+                kirimPesananReguler(sharedData, argv[2], username);
+            } else if (strcmp(argv[1], "-status") == 0 && argc == 3) {
+                // Cek status pesanan
+                cekStatus(sharedData, argv[2]);
+            } else if (strcmp(argv[1], "-list") == 0) {
+                // Tampilkan semua pesanan
+                tampilkanDaftarPesanan(sharedData);
+            } else {
+                printf("Penggunaan:\n");
+                printf("  ./dispatcher -deliver [Nama] - untuk mengirim pesanan\n");
+                printf("  ./dispatcher -status [Nama] - untuk memeriksa status pesanan\n");
+                printf("  ./dispatcher -list - untuk melihat semua pesanan\n");
+            }
         } else {
-            printf("Penggunaan:\n");
-            printf("  ./dispatcher -deliver [Nama] - untuk mengirim pesanan\n");
-            printf("  ./dispatcher -status [Nama] - untuk memeriksa status pesanan\n");
-            printf("  ./dispatcher -list - untuk melihat semua pesanan\n");
+            // Inisialisasi - unduh dan muat data dari CSV
+            printf("Memulai sistem RushGo...\n");
+            printf("Mengunduh file pesanan...\n");
+            
+            // Muat data ke shared memory
+            if (muatDataDariCSV(sharedData)) {
+                printf("Berhasil memuat data ke shared memory\n");
+            } else {
+                printf("Gagal memuat data ke shared memory\n");
+            }
         }
-    } else {
-        // Inisialisasi - unduh dan muat data dari CSV
-        printf("Memulai sistem RushGo...\n");
-        printf("Mengunduh file pesanan...\n");
         
-        // Muat data ke shared memory
-        if (muatDataDariCSV(sharedData)) {
-            printf("Berhasil memuat data ke shared memory\n");
-        } else {
-            printf("Gagal memuat data ke shared memory\n");
-        }
-    }
 Penjelasan:
 
 Memeriksa argumen command line untuk menentukan operasi yang dilakukan
@@ -1020,20 +1022,24 @@ Memeriksa argumen command line untuk menentukan operasi yang dilakukan
 Tanpa argumen: Menginisialisasi sistem dengan mengunduh dan memuat data CSV
 
 3. Program delivery_agent.c
+
 Inisialisasi dan Koneksi ke Shared Memory
-    // Dapatkan shared memory
-    int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666);
-    if (shmid == -1) {
-        printf("Error: Shared memory belum dibuat. Jalankan dispatcher terlebih dahulu.\n");
-        exit(EXIT_FAILURE);
-    }
-    
-    // Attach shared memory
-    SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
-    if (sharedData == (void *)-1) {
-        perror("shmat");
-        exit(EXIT_FAILURE);
-    }
+
+
+        // Dapatkan shared memory
+        int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666);
+        if (shmid == -1) {
+            printf("Error: Shared memory belum dibuat. Jalankan dispatcher terlebih dahulu.\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Attach shared memory
+        SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
+        if (sharedData == (void *)-1) {
+            perror("shmat");
+            exit(EXIT_FAILURE);
+        }
+        
 Penjelasan:
 
 Mendapatkan shared memory yang telah dibuat oleh dispatcher menggunakan key yang sama
@@ -1041,83 +1047,85 @@ Melakukan attach shared memory ke ruang alamat proses delivery_agent
 Jika shared memory belum dibuat, program memberikan pesan error dan keluar
 
 Implementasi Thread untuk Agen Pengiriman Express
+    
     // Fungsi untuk thread agen
-    void *agenExpress(void *arg) {
-        DataAgen *dataAgen = (DataAgen *)arg;
-        SharedData *sharedData = dataAgen->sharedData;
-        
-        // Set flag running ke true
-        dataAgen->running = true;
-        dataAgen->pesananDiproses = 0;
-        
-        printf("AGENT %s: Mulai mencari pesanan Express\n", dataAgen->nama);
-        
-        // Counter untuk membatasi jumlah percobaan
-        int tryCount = 0;
-        
-        while (dataAgen->running && !berhenti && tryCount < MAX_TRY_COUNT) {
-            bool found = false;
+        void *agenExpress(void *arg) {
+            DataAgen *dataAgen = (DataAgen *)arg;
+            SharedData *sharedData = dataAgen->sharedData;
             
-            // Cari pesanan Express yang belum dikirim
-            pthread_mutex_lock(&mutex);
-            for (int i = 0; i < sharedData->jumlahPesanan; i++) {
-                if (strcmp(sharedData->pesanan[i].tipe, "Express") == 0 && 
-                    !sharedData->pesanan[i].terkirim) {
-                    
-                    // Flag bahwa kita menemukan pesanan
-                    found = true;
-                    
-                    // Kirim pesanan
-                    sharedData->pesanan[i].terkirim = true;
-                    strcpy(sharedData->pesanan[i].dikirimOleh, dataAgen->nama);
-                    
-                    // Simpan nama dan alamat untuk log
-                    char nama[50], alamat[100];
-                    strcpy(nama, sharedData->pesanan[i].nama);
-                    strcpy(alamat, sharedData->pesanan[i].alamat);
-                    
+            // Set flag running ke true
+            dataAgen->running = true;
+            dataAgen->pesananDiproses = 0;
+            
+            printf("AGENT %s: Mulai mencari pesanan Express\n", dataAgen->nama);
+            
+            // Counter untuk membatasi jumlah percobaan
+            int tryCount = 0;
+            
+            while (dataAgen->running && !berhenti && tryCount < MAX_TRY_COUNT) {
+                bool found = false;
+                
+                // Cari pesanan Express yang belum dikirim
+                pthread_mutex_lock(&mutex);
+                for (int i = 0; i < sharedData->jumlahPesanan; i++) {
+                    if (strcmp(sharedData->pesanan[i].tipe, "Express") == 0 && 
+                        !sharedData->pesanan[i].terkirim) {
+                        
+                        // Flag bahwa kita menemukan pesanan
+                        found = true;
+                        
+                        // Kirim pesanan
+                        sharedData->pesanan[i].terkirim = true;
+                        strcpy(sharedData->pesanan[i].dikirimOleh, dataAgen->nama);
+                        
+                        // Simpan nama dan alamat untuk log
+                        char nama[50], alamat[100];
+                        strcpy(nama, sharedData->pesanan[i].nama);
+                        strcpy(alamat, sharedData->pesanan[i].alamat);
+                        
+                        pthread_mutex_unlock(&mutex);
+                        
+                        // Tambahkan log
+                        tambahLog(dataAgen->nama, nama, alamat, "Express");
+                        
+                        // Increment counter
+                        dataAgen->pesananDiproses++;
+                        
+                        printf("AGENT %s: Pesanan Express untuk %s telah dikirim\n", 
+                               dataAgen->nama, nama);
+                        
+                        // Reset counter karena kita menemukan pesanan
+                        tryCount = 0;
+                        
+                        // Tunggu sejenak sebelum mencari pesanan berikutnya
+                        sleep(1);
+                        break;
+                    }
+                }
+                
+                // Jika loop selesai tanpa melepaskan mutex
+                if (!found) {
                     pthread_mutex_unlock(&mutex);
+                }
+                
+                // Jika tidak ada pesanan Express yang ditemukan
+                if (!found) {
+                    tryCount++;
                     
-                    // Tambahkan log
-                    tambahLog(dataAgen->nama, nama, alamat, "Express");
-                    
-                    // Increment counter
-                    dataAgen->pesananDiproses++;
-                    
-                    printf("AGENT %s: Pesanan Express untuk %s telah dikirim\n", 
-                           dataAgen->nama, nama);
-                    
-                    // Reset counter karena kita menemukan pesanan
-                    tryCount = 0;
-                    
-                    // Tunggu sejenak sebelum mencari pesanan berikutnya
-                    sleep(1);
-                    break;
+                    // Tidur sebentar sebelum memeriksa kembali
+                    sleep(2);
                 }
             }
             
-            // Jika loop selesai tanpa melepaskan mutex
-            if (!found) {
-                pthread_mutex_unlock(&mutex);
+            if (tryCount >= MAX_TRY_COUNT) {
+                printf("AGENT %s: Selesai - total %d pesanan Express telah diproses\n", 
+                       dataAgen->nama, dataAgen->pesananDiproses);
             }
             
-            // Jika tidak ada pesanan Express yang ditemukan
-            if (!found) {
-                tryCount++;
-                
-                // Tidur sebentar sebelum memeriksa kembali
-                sleep(2);
-            }
+            dataAgen->running = false;
+            return NULL;
         }
         
-        if (tryCount >= MAX_TRY_COUNT) {
-            printf("AGENT %s: Selesai - total %d pesanan Express telah diproses\n", 
-                   dataAgen->nama, dataAgen->pesananDiproses);
-        }
-        
-        dataAgen->running = false;
-        return NULL;
-    }
 Penjelasan:
 
 Fungsi thread yang dieksekusi oleh setiap agen pengiriman Express
@@ -1128,19 +1136,21 @@ Jika tidak ada pesanan ditemukan setelah beberapa kali percobaan, thread akan be
 Counter menampilkan jumlah pesanan yang telah diproses oleh setiap agen
 
 Pembuatan Thread untuk Tiga Agen
-    // Buat thread untuk tiga agen
-    if (pthread_create(&dataAgenA.thread_id, NULL, agenExpress, &dataAgenA) != 0 ||
-        pthread_create(&dataAgenB.thread_id, NULL, agenExpress, &dataAgenB) != 0 ||
-        pthread_create(&dataAgenC.thread_id, NULL, agenExpress, &dataAgenC) != 0) {
-        printf("Error: Gagal membuat thread\n");
-        
-        // Detach shared memory
-        if (shmdt(sharedData) == -1) {
-            perror("shmdt");
+    
+       // Buat thread untuk tiga agen
+        if (pthread_create(&dataAgenA.thread_id, NULL, agenExpress, &dataAgenA) != 0 ||
+            pthread_create(&dataAgenB.thread_id, NULL, agenExpress, &dataAgenB) != 0 ||
+            pthread_create(&dataAgenC.thread_id, NULL, agenExpress, &dataAgenC) != 0) {
+            printf("Error: Gagal membuat thread\n");
+            
+            // Detach shared memory
+            if (shmdt(sharedData) == -1) {
+                perror("shmdt");
+            }
+            
+            exit(EXIT_FAILURE);
         }
         
-        exit(EXIT_FAILURE);
-    }
 Penjelasan:
 
 Membuat tiga thread terpisah untuk AGENT A, B, dan C
@@ -1148,46 +1158,49 @@ Setiap thread menjalankan fungsi agenExpress dengan parameter yang berbeda
 Jika pembuatan thread gagal, program akan mendetach shared memory dan keluar
 
 Auto-Exit Mechanism
-    // Loop utama dengan auto-exit
-    int checkCount = 0;
-    bool autoExit = false;
+
     
-    while (!berhenti) {
-        // Tidur sejenak
-        sleep(1);
-        checkCount++;
+        // Loop utama dengan auto-exit
+        int checkCount = 0;
+        bool autoExit = false;
         
-        // Periksa apakah semua thread selesai
-        if (!dataAgenA.running && !dataAgenB.running && !dataAgenC.running) {
-            printf("Semua agen telah selesai mengirimkan pesanan Express\n");
-            autoExit = true;
-            break;
-        }
-        
-        // Setiap CHECK_INTERVAL detik, periksa status pesanan
-        if (checkCount >= CHECK_INTERVAL) {
-            checkCount = 0;
+        while (!berhenti) {
+            // Tidur sejenak
+            sleep(1);
+            checkCount++;
             
-            // Jika tidak ada lagi pesanan Express yang belum dikirim, persiapkan untuk keluar
-            if (!masihAdaPesananExpress(sharedData)) {
-                // Hitung total pesanan Express yang telah diproses
-                int totalProcessed = dataAgenA.pesananDiproses + dataAgenB.pesananDiproses + 
-                                    dataAgenC.pesananDiproses;
-                
-                printf("Semua pesanan Express telah terkirim (%d pesanan). Bersiap untuk berhenti...\n", 
-                       totalProcessed);
-                
-                // Tandai untuk keluar dari loop utama
+            // Periksa apakah semua thread selesai
+            if (!dataAgenA.running && !dataAgenB.running && !dataAgenC.running) {
+                printf("Semua agen telah selesai mengirimkan pesanan Express\n");
                 autoExit = true;
-                
-                // Set flag untuk berhenti
-                dataAgenA.running = false;
-                dataAgenB.running = false;
-                dataAgenC.running = false;
                 break;
             }
+            
+            // Setiap CHECK_INTERVAL detik, periksa status pesanan
+            if (checkCount >= CHECK_INTERVAL) {
+                checkCount = 0;
+                
+                // Jika tidak ada lagi pesanan Express yang belum dikirim, persiapkan untuk keluar
+                if (!masihAdaPesananExpress(sharedData)) {
+                    // Hitung total pesanan Express yang telah diproses
+                    int totalProcessed = dataAgenA.pesananDiproses + dataAgenB.pesananDiproses + 
+                                        dataAgenC.pesananDiproses;
+                    
+                    printf("Semua pesanan Express telah terkirim (%d pesanan). Bersiap untuk berhenti...\n", 
+                           totalProcessed);
+                    
+                    // Tandai untuk keluar dari loop utama
+                    autoExit = true;
+                    
+                    // Set flag untuk berhenti
+                    dataAgenA.running = false;
+                    dataAgenB.running = false;
+                    dataAgenC.running = false;
+                    break;
+                }
+            }
         }
-    }
+        
 Penjelasan:
 
 Implementasi mekanisme auto-exit yang memungkinkan program berhenti secara otomatis
@@ -1196,23 +1209,25 @@ Jika semua pesanan Express sudah terkirim, program akan berhenti secara otomatis
 Program juga berhenti jika semua thread telah selesai
 
 4. Logging System
-    cvoid tambahLog(char *sumber, char *nama, char *alamat, char *tipe) {
-        FILE *logFile = fopen(LOG_FILE, "a");
-        if (logFile == NULL) {
-            printf("Error: Tidak bisa membuka file log\n");
-            return;
+
+
+        cvoid tambahLog(char *sumber, char *nama, char *alamat, char *tipe) {
+            FILE *logFile = fopen(LOG_FILE, "a");
+            if (logFile == NULL) {
+                printf("Error: Tidak bisa membuka file log\n");
+                return;
+            }
+            
+            time_t now = time(NULL);
+            struct tm *t = localtime(&now);
+            
+            fprintf(logFile, "[%02d/%02d/%04d %02d:%02d:%02d] [AGENT %s] %s package delivered to %s in %s\n",
+                    t->tm_mday, t->tm_mon + 1, t->tm_year + 1900,
+                    t->tm_hour, t->tm_min, t->tm_sec,
+                    sumber, tipe, nama, alamat);
+            
+            fclose(logFile);
         }
-        
-        time_t now = time(NULL);
-        struct tm *t = localtime(&now);
-        
-        fprintf(logFile, "[%02d/%02d/%04d %02d:%02d:%02d] [AGENT %s] %s package delivered to %s in %s\n",
-                t->tm_mday, t->tm_mon + 1, t->tm_year + 1900,
-                t->tm_hour, t->tm_min, t->tm_sec,
-                sumber, tipe, nama, alamat);
-        
-        fclose(logFile);
-    }
 Penjelasan:
 
 Mencatat setiap pengiriman ke file log dengan format yang telah ditentukan
