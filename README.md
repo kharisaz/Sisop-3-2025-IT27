@@ -833,20 +833,20 @@ SharedData: Menyimpan array pesanan dan jumlah total pesanan untuk disimpan dala
 
 2. Program dispatcher.c
 Inisialisasi Shared Memory
-
-     // Buat atau dapatkan shared memory
-            int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666 | IPC_CREAT);
-            if (shmid == -1) {
-                perror("shmget");
-                exit(EXIT_FAILURE);
-            }
-            
-            // Attach shared memory
-            SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
-            if (sharedData == (void *)-1) {
-                perror("shmat");
-                exit(EXIT_FAILURE);
-            }
+    
+      // Buat atau dapatkan shared memory
+                int shmid = shmget(SHM_KEY, sizeof(SharedData), 0666 | IPC_CREAT);
+                if (shmid == -1) {
+                    perror("shmget");
+                    exit(EXIT_FAILURE);
+                }
+                
+                // Attach shared memory
+                SharedData *sharedData = (SharedData *)shmat(shmid, NULL, 0);
+                if (sharedData == (void *)-1) {
+                    perror("shmat");
+                    exit(EXIT_FAILURE);
+                }
 
 Penjelasan:
 
