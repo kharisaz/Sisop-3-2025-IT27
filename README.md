@@ -2008,6 +2008,7 @@ Increment cid: Siapkan slot berikutnya; jika sudah mencapai MAX_CLIENTS, break l
 Setelah loop selesai (bila slot penuh atau error), socket server ditutup dan program berakhir.
 
 #soal_4
+
 Pada soal nomor 4, kita ditugaskan untuk membuat program dengan 2 file yang saling shared memory, yakni system.c dan hunter.c
 
 A. Pertama kita fokus pada pembuatan system.c
@@ -2055,7 +2056,7 @@ A. Pertama kita fokus pada pembuatan system.c
             struct Dungeon dungeons[MAX_DUNGEONS];
             int total_dungeons;
         };
-   2. Selanjutnya kita membuat fungsi untuk bisa menampilkan semua hunters yang terdaftar
+2. Selanjutnya kita membuat fungsi untuk bisa menampilkan semua hunters yang terdaftar
 
                   void hunters_info(struct Database *data) {
                 printf("\n====== HUNTER INFO ======\n");
